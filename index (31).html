@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Job – Nawon Design</title>
+<style>
+:root{--bg:#f3f6fb;--card:#fff;--tx:#14213d;--mut:#64748b;--pri:#1155cc;--bd:#d5deee;--ok:#16794c;--err:#b42318}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1420;--card:#172033;--tx:#e8eefb;--mut:#93a3bf;--pri:#4d8dff;--bd:#2a3855;--ok:#4ade80;--err:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:#1155cc;color:#fff;padding:18px 20px;font-weight:700;letter-spacing:.5px;text-align:center}
+main{max-width:1000px;margin:20px auto;padding:0 14px;display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media(min-width:860px){main{grid-template-columns:380px minmax(0,1fr)}}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:18px}
+h2{margin:0 0 12px;font-size:16px}
+label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin:12px 0 4px;text-transform:uppercase}
+input,select{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{margin-top:18px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--pri);color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+button:disabled{opacity:.6}
+#msg{margin-top:10px;font-size:14px;min-height:20px}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px;border-bottom:1px solid var(--bd);text-align:left;white-space:nowrap}
+th{color:var(--mut);font-size:11px;text-transform:uppercase}
+.tag{padding:2px 8px;border-radius:99px;background:var(--bg);border:1px solid var(--bd)}
+</style>
+</head>
+<body>
+<header>BOOK JOB – THIẾT KẾ</header>
+<main>
+<section class="card">
+  <h2>Đặt job mới</h2>
+  <div id="f">
+    <label>Loại task</label>
+    <select id="task"></select>
+    <label>Tiêu đề job</label>
+    <input id="title" placeholder="VD: Quốc khánh Zambia 24/10">
+    <div class="row">
+      <div><label>Deadline</label><input id="deadline" type="date"></div>
+      <div><label>Số lượng</label><input id="qty" type="number" min="1" value="1"></div>
+    </div>
+    <label>Người giao việc</label>
+    <select id="assign"></select>
+    <label>Designer (tuỳ chọn)</label>
+    <select id="designer"></select>
+    <button id="go">Gửi job</button>
+    <div id="msg"></div>
+  </div>
+</section>
+<section class="card">
+  <h2>Job gần đây</h2>
+  <div class="wrap"><table>
+    <thead><tr><th>Task</th><th>Title</th><th>Deadline</th><th>Status</th><th>Designer</th><th>SL</th></tr></thead>
+    <tbody id="list"><tr><td colspan="6">Đang tải…</td></tr></tbody>
+  </table></div>
+</section>
+</main>
+<script>
+// ====== CẤU HÌNH ======
+const API_URL = "DÁN_URL_APPS_SCRIPT_VÀO_ĐÂY"; // URL Web App (kết thúc bằng /exec)
+const TASKS = ["Thiệp","Banner","Post Social","Sửa Ảnh","In ấn"];
+const ASSIGN = ["Ms. Diệu","Ms. Tuyền","Mr. Vinh"];
+const DESIGNERS = ["", "Vũ","Thành"];
+// =======================
+const $ = id => document.getElementById(id);
+const fill = (el, arr) => el.innerHTML = arr.map(v => `<option value="${v}">${v || "— Chưa chọn —"}</option>`).join("");
+fill($("task"),TASKS); fill($("assign"),ASSIGN); fill($("designer"),DESIGNERS);
+$("deadline").valueAsDate = new Date(Date.now()+3*864e5);
+
+function msg(t,c){ $("msg").textContent=t; $("msg").style.color=c||"inherit"; }
+const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+async function load(){
+  try{
+    const r = await fetch(API_URL+"?limit=15");
+    const d = await r.json();
+    $("list").innerHTML = d.rows.map(x=>`<tr><td>${esc(x.task)}</td><td>${esc(x.title)}</td><td>${esc(x.deadline)}</td><td><span class="tag">${esc(x.status)}</span></td><td>${esc(x.designer)}</td><td>${esc(x.qty)}</td></tr>`).join("") || '<tr><td colspan="6">Chưa có job</td></tr>';
+  }catch(e){ $("list").innerHTML='<tr><td colspan="6">Chưa kết nối được Google Sheet (kiểm tra API_URL).</td></tr>'; }
+}
+
+$("go").onclick = async () => {
+  const data = {task:$("task").value, title:$("title").value.trim(), deadline:$("deadline").value,
+    qty:+$("qty").value||1, assign:$("assign").value, designer:$("designer").value};
+  if(!data.title || !data.deadline) return msg("Vui lòng nhập tiêu đề và deadline.","var(--err)");
+  $("go").disabled = true; msg("Đang gửi…");
+  try{
+    await fetch(API_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(data)});
+    msg("✓ Đã gửi job lên Google Sheet.","var(--ok)");
+    $("title").value=""; $("qty").value=1;
+    setTimeout(load,2000);
+  }catch(e){ msg("Gửi thất bại: "+e.message,"var(--err)"); }
+  $("go").disabled = false;
+};
+load();
+</script>
+</body>
+</html>
